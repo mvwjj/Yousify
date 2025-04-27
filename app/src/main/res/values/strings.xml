@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">Yousify</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="track_detail">Track Details</string>
+    <string name="artist">Artist</string>
+    <string name="isrc">ISRC</string>
+    <string name="duration">Duration</string>
+    <string name="playlist">Playlist</string>
+    <string name="tracks">Треки</string>
+    <string name="no_tracks">В этом плейлисте нет треков</string>
+    <string name="search">Search</string>
+    <string name="settings">Settings</string>
+    <string name="sync">Sync with Spotify</string>
+    <string name="clear_cache">Clear YouTube Cache</string>
+    <string name="about">About</string>
+    <string name="app_info">Yousify v1.0\nAuthor: veshikov\n 2025</string>
+    <string name="not_found">Not found</string>
+    <string name="loading">Loading…</string>
+    <string name="track_cover_description">Track cover image</string>
+    <string name="sponsor_block_active">Sponsors auto-skipped</string>
+    <string name="close_player">Close player</string>
+    <string name="skip_previous">Previous track</string>
+    <string name="skip_next">Next track</string>
+    <string name="playback_error">Ошибка воспроизведения</string>
+    <string name="network_error">Ошибка сети</string>
+    <string name="retry">Повторить</string>
+    <string name="playback_info">Playback information</string>
+    <string name="track_info">Информация о треке</string>
+    <string name="close">Закрыть</string>
+    <string name="audio_only_mode">Audio-only mode (saves data &amp; battery)</string>
+    <string name="loading_track">Loading track…</string>
+    <string name="error_no_connection">No internet connection</string>
+    <string name="error_track_not_found">Track not found</string>
+    <string name="error_playback_failed">Playback failed</string>
+</resources>

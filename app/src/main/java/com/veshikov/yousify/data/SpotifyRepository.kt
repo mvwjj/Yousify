@@ -1,0 +1,40 @@
+package com.veshikov.yousify.data
+
+import com.veshikov.yousify.data.model.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import com.veshikov.yousify.utils.Logger
+
+class SpotifyRepository {
+    private val apiWrapper = SpotifyApiWrapper.getInstance()
+
+    fun getUserPlaylists(): Flow<List<Playlist>> = flow {
+        try {
+            val list = apiWrapper.getUserPlaylists() ?: emptyList<Playlist>()
+            emit(list)
+        } catch (e: Exception) {
+            Logger.e("Repo getUserPlaylists", e)
+            throw e
+        }
+    }
+
+    fun getPlaylistTracks(id: String): Flow<List<TrackItem>> = flow {
+        try {
+            val list = apiWrapper.getPlaylistTracks(id) ?: emptyList<TrackItem>()
+            emit(list)
+        } catch (e: Exception) {
+            Logger.e("Repo getPlaylistTracks", e)
+            throw e
+        }
+    }
+
+    fun getLikedTracks(): Flow<List<TrackItem>> = flow {
+        try {
+            val list = apiWrapper.getLikedTracks() ?: emptyList<TrackItem>()
+            emit(list)
+        } catch (e: Exception) {
+            Logger.e("Repo getLikedTracks", e)
+            throw e
+        }
+    }
+}

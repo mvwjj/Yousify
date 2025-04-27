@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+      android:layout_margin="4dp"
+      app:cardCornerRadius="8dp"
+      app:cardElevation="2dp">
+    <LinearLayout
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+      <ImageView
+          android:id="@+id/playlistImage"
+          android:layout_width="56dp"
+          android:layout_height="56dp"
+          android:scaleType="centerCrop"
+          android:src="@drawable/ic_playlist_placeholder"/>
+      <LinearLayout
+          android:orientation="vertical"
+          android:layout_marginStart="12dp"
+          android:layout_width="0dp"
+          android:layout_weight="1"
+          android:layout_height="wrap_content"
+          android:layout_gravity="center_vertical">
+        <TextView
+            android:id="@+id/playlistName"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+        <TextView
+            android:id="@+id/playlistDescription"
+            android:textSize="14sp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+      </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
