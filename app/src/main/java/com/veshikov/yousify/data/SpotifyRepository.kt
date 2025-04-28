@@ -27,14 +27,4 @@ class SpotifyRepository {
             throw e
         }
     }
-
-    fun getLikedTracks(): Flow<List<TrackItem>> = flow {
-        try {
-            val list = apiWrapper.getLikedTracks() ?: emptyList<TrackItem>()
-            emit(list)
-        } catch (e: Exception) {
-            Logger.e("Repo getLikedTracks", e)
-            throw e
-        }
-    }
 }

@@ -6,8 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.veshikov.yousify.data.YousifyRepository
 import com.veshikov.yousify.data.model.PlaylistEntity
 import com.veshikov.yousify.data.model.TrackEntity
-import com.veshikov.yousify.data.model.TrackItem
-import com.veshikov.yousify.data.SpotifyRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,9 +24,6 @@ class YousifyViewModel(app: Application) : AndroidViewModel(app) {
     private val _selectedPlaylistId = MutableStateFlow<String?>(null)
     val selectedPlaylistId: StateFlow<String?> = _selectedPlaylistId.asStateFlow()
 
-    private val _likedTracks = MutableStateFlow<List<TrackItem>>(emptyList())
-    val likedTracks: StateFlow<List<TrackItem>> = _likedTracks.asStateFlow()
-
     fun loadPlaylists() {
         viewModelScope.launch {
             repo.getPlaylists().collect { _playlists.value = it }
@@ -45,12 +40,6 @@ class YousifyViewModel(app: Application) : AndroidViewModel(app) {
     fun sync() {
         viewModelScope.launch {
             repo.syncPlaylistsAndTracks()
-        }
-    }
-
-    fun loadLikedTracks() {
-        viewModelScope.launch {
-            SpotifyRepository().getLikedTracks().collect { _likedTracks.value = it }
         }
     }
 }

@@ -88,44 +88,6 @@ class SpotifyApiWrapper private constructor() {
         }
     }
 
-    suspend fun getLikedTracks(): List<TrackItem>? = withContext(Dispatchers.IO) {
-        try {
-            Logger.i("Получаем лайкнутые треки пользователя через /me/tracks")
-            val token = accessToken
-            if (token != null) {
-                val allTracks = mutableListOf<TrackItem>()
-                var nextUrl: String? = "https://api.spotify.com/v1/me/tracks?limit=100"
-                var page = 0
-                while (nextUrl != null) {
-                    try {
-                        Logger.i("SpotifyApiWrapper: fetch liked page $page, url=$nextUrl")
-                        val jsonString = SpotifyJsonParser.fetchJsonFromUrl(nextUrl, token)
-                        if (jsonString == null) {
-                            Logger.e("fetchJsonFromUrl вернул null для $nextUrl (liked tracks)")
-                            break
-                        }
-                        val jsonObject = org.json.JSONObject(jsonString)
-                        val tracks = SpotifyJsonParser.parsePlaylistTracksJson(jsonString)
-                        Logger.i("SpotifyApiWrapper: liked page $page, получено треков: ${tracks.size}")
-                        allTracks.addAll(tracks)
-                        nextUrl = if (jsonObject.isNull("next")) null else jsonObject.optString("next", null)
-                        page++
-                    } catch (ex: Exception) {
-                        Logger.e("Ошибка при загрузке страницы $page лайкнутых треков", ex)
-                        break
-                    }
-                }
-                Logger.i("SpotifyApiWrapper: всего получено лайкнутых треков: ${allTracks.size}")
-                return@withContext allTracks
-            }
-            Logger.i("Не удалось получить лайкнутые треки: нет токена")
-            return@withContext emptyList()
-        } catch (e: Exception) {
-            Logger.e("Ошибка при получении лайкнутых треков", e)
-            return@withContext null
-        }
-    }
-
     fun release() {
         accessToken = null
         Logger.i("Spotify API released")

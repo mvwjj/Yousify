@@ -9,22 +9,13 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
-import coil.transform.CircleCropTransformation
+import com.bumptech.glide.Glide
 import com.veshikov.yousify.R
 import com.veshikov.yousify.data.model.Playlist
 
 class PlaylistAdapter(
     private val onClick: (Playlist) -> Unit
 ) : ListAdapter<Playlist, PlaylistAdapter.VH>(Diff()) {
-
-    companion object {
-        const val LIKED_SONGS_ID = "__liked_songs__"
-    }
-
-    fun submitPlaylistsWithLiked(playlists: List<Playlist>, liked: Playlist?) {
-        val newList = if (liked != null) listOf(liked) + playlists else playlists
-        submitList(newList)
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_playlist, parent, false)
@@ -47,13 +38,6 @@ class PlaylistAdapter(
         }
         fun bind(p: Playlist) {
             try {
-                // Специальное оформление для лайкнутых треков
-                if (p.id == LIKED_SONGS_ID) {
-                    itemView.setBackgroundResource(R.drawable.liked_songs_border)
-                } else {
-                    itemView.setBackgroundResource(0)
-                }
-                
                 // Безопасная установка имени плейлиста
                 playlistName.text = p.name ?: "Неизвестный плейлист"
                 
@@ -75,18 +59,30 @@ class PlaylistAdapter(
                 }
                 android.util.Log.i("Yousify", "[PlaylistAdapter] imageUrl=$imageUrl for playlist=${p.name}")
                 
-                if (imageUrl != null) {
+                if (!imageUrl.isNullOrEmpty()) {
+                    // Coil автоматически поддерживает JPEG/PNG/WebP, SVG требует coil-svg
                     playlistImage.load(imageUrl) {
                         crossfade(true)
                         placeholder(R.drawable.ic_playlist_placeholder)
                         error(R.drawable.ic_playlist_placeholder)
-                        transformations(CircleCropTransformation())
+                        listener(
+                            onError = { _, _ ->
+                                android.util.Log.w("Yousify", "Coil failed for $imageUrl, fallback to Glide")
+                                Glide.with(itemView.context)
+                                    .load(imageUrl)
+                                    .placeholder(R.drawable.ic_playlist_placeholder)
+                                    .error(R.drawable.ic_playlist_placeholder)
+                                    .into(playlistImage)
+                                true
+                            }
+                        )
                     }
                 } else {
+                    android.util.Log.w("Yousify", "[PlaylistAdapter] imageUrl is null or empty for playlist=${p.name}")
                     playlistImage.setImageResource(R.drawable.ic_playlist_placeholder)
                 }
             } catch (e: Exception) {
-                // В случае любой ошибки устанавливаем значения по умолчанию
+                android.util.Log.e("Yousify", "Ошибка загрузки плейлиста: ${e.message}", e)
                 playlistName.text = "Плейлист"
                 playlistDescription.text = ""
                 playlistImage.setImageResource(R.drawable.ic_playlist_placeholder)

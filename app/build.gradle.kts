@@ -2,6 +2,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.kapt")
     id("com.google.devtools.ksp") version "1.9.23-1.0.20"
 }
 
@@ -147,6 +148,10 @@ dependencies {
 
     // — Security
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // — Glide
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    kapt("com.github.bumptech.glide:compiler:4.16.0")
 
     // — Tests
     testImplementation("junit:junit:4.13.2")
