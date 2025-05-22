@@ -33,4 +33,5 @@
     <string name="error_no_connection">No internet connection</string>
     <string name="error_track_not_found">Track not found</string>
     <string name="error_playback_failed">Playback failed</string>
+    <string name="playback_error_default">Произошла ошибка воспроизведения</string>
 </resources>

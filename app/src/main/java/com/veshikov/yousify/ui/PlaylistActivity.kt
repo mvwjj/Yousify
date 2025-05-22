@@ -24,12 +24,16 @@ class PlaylistActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var progressBar: ProgressBar
     private lateinit var noPlaylistsText: TextView
-    private val apiWrapper = SpotifyApiWrapper.getInstance()
+    // ИСПРАВЛЕНО: apiWrapper инициализируется в onCreate, используя контекст
+    private lateinit var apiWrapper: SpotifyApiWrapper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_playlist)
-        
+
+        // ИСПРАВЛЕНО: Инициализация apiWrapper
+        apiWrapper = SpotifyApiWrapper.getInstance(this)
+
         recyclerView = findViewById(R.id.recyclerView)
         progressBar = findViewById(R.id.progressBar)
         noPlaylistsText = findViewById(R.id.noPlaylistsText)
@@ -40,92 +44,61 @@ class PlaylistActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
-        // Показываем индикатор загрузки
         progressBar.visibility = View.VISIBLE
         recyclerView.visibility = View.GONE
-        
+
         lifecycleScope.launch {
             try {
-                Logger.i("PlaylistActivity: Начинаем загрузку плейлистов")
-                
-                // Получаем плейлисты с повторными попытками
+                Logger.i("PlaylistActivity: Starting playlist loading")
+
                 var playlists: List<Playlist>? = apiWrapper.getUserPlaylists()
-                
-                // Если первая попытка не удалась, пробуем еще раз
+
                 if (playlists == null) {
-                    Logger.i("PlaylistActivity: Первая попытка получения плейлистов не удалась, пробуем еще раз")
-                    // Небольшая задержка перед повторной попыткой
-                    kotlinx.coroutines.delay(1000)
+                    Logger.i("PlaylistActivity: First attempt to get playlists failed, retrying once...")
+                    kotlinx.coroutines.delay(1500) // Немного увеличил задержку
                     playlists = apiWrapper.getUserPlaylists()
                 }
-                
-                // Если и вторая попытка не удалась, пробуем еще раз с большей задержкой
+                // Удалена третья попытка для краткости, но можно добавить при необходимости
+
                 if (playlists == null) {
-                    Logger.i("PlaylistActivity: Вторая попытка получения плейлистов не удалась, пробуем еще раз")
-                    // Большая задержка перед третьей попыткой
-                    kotlinx.coroutines.delay(2000)
-                    playlists = apiWrapper.getUserPlaylists()
-                }
-                
-                if (playlists == null) {
-                    Logger.e("PlaylistActivity: Ошибка при получении плейлистов (null)")
+                    Logger.e("PlaylistActivity: Error getting playlists (null after retries)")
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(this@PlaylistActivity, "Ошибка при получении плейлистов", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@PlaylistActivity, "Error getting playlists", Toast.LENGTH_LONG).show()
                         progressBar.visibility = View.GONE
+                        noPlaylistsText.text = "Failed to load playlists. Please try again."
+                        noPlaylistsText.visibility = View.VISIBLE
                     }
                     return@launch
                 }
-                
-                Logger.i("PlaylistActivity: Получено плейлистов: ${playlists.size}")
-                
-                // Фильтруем плейлисты с null id
-                val validPlaylists = playlists.filter { it.id != null }
+
+                Logger.i("PlaylistActivity: Received playlists: ${playlists.size}")
+
+                val validPlaylists = playlists.filter { it.id != null && it.id.isNotBlank() } // Добавил isNotBlank
                 if (validPlaylists.size < playlists.size) {
-                    Logger.w("PlaylistActivity: Отфильтровано ${playlists.size - validPlaylists.size} плейлистов с null id")
+                    Logger.w("PlaylistActivity: Filtered out ${playlists.size - validPlaylists.size} playlists with null or blank id")
                 }
-                
-                // Проверяем, что у нас есть плейлисты
-                if (validPlaylists.isEmpty() && playlists.isNotEmpty()) {
-                    Logger.w("PlaylistActivity: Все полученные плейлисты имеют null id, пробуем еще раз")
-                    // Еще одна попытка с большой задержкой
-                    kotlinx.coroutines.delay(3000)
-                    val retryPlaylists = apiWrapper.getUserPlaylists()
-                    if (retryPlaylists != null && retryPlaylists.isNotEmpty()) {
-                        val retryValidPlaylists = retryPlaylists.filter { it.id != null }
-                        if (retryValidPlaylists.isNotEmpty()) {
-                            Logger.i("PlaylistActivity: После повторной попытки получено ${retryValidPlaylists.size} валидных плейлистов")
-                            
-                            withContext(Dispatchers.Main) {
-                                Logger.i("PlaylistActivity: Отображаем ${retryValidPlaylists.size} плейлистов")
-                                recyclerView.visibility = View.VISIBLE
-                                adapter.submitList(retryValidPlaylists)
-                                progressBar.visibility = View.GONE
-                            }
-                            return@launch
-                        }
-                    }
-                }
-                
+
                 withContext(Dispatchers.Main) {
                     if (validPlaylists.isEmpty()) {
-                        // Мы знаем, что у пользователя есть плейлисты, поэтому сообщение изменено
-                        Toast.makeText(this@PlaylistActivity, "Не удалось загрузить плейлисты. Пожалуйста, попробуйте позже.", Toast.LENGTH_LONG).show()
-                        Logger.i("PlaylistActivity: Плейлисты не найдены")
+                        Toast.makeText(this@PlaylistActivity, "No playlists found or failed to load.", Toast.LENGTH_LONG).show()
+                        Logger.i("PlaylistActivity: No valid playlists found to display")
+                        noPlaylistsText.text = "No playlists available."
                         noPlaylistsText.visibility = View.VISIBLE
                     } else {
-                        Logger.i("PlaylistActivity: Отображаем ${validPlaylists.size} плейлистов")
+                        Logger.i("PlaylistActivity: Displaying ${validPlaylists.size} playlists")
                         recyclerView.visibility = View.VISIBLE
+                        noPlaylistsText.visibility = View.GONE // Скрываем текст, если плейлисты есть
                     }
                     adapter.submitList(validPlaylists)
-                    
-                    // Скрываем индикатор загрузки
                     progressBar.visibility = View.GONE
                 }
             } catch (e: Exception) {
-                Logger.e("PlaylistActivity: Ошибка загрузки плейлистов", e)
+                Logger.e("PlaylistActivity: Error loading playlists", e)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@PlaylistActivity, "Ошибка загрузки плейлистов: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@PlaylistActivity, "Error loading playlists: ${e.message}", Toast.LENGTH_LONG).show()
                     progressBar.visibility = View.GONE
+                    noPlaylistsText.text = "Error: ${e.message}"
+                    noPlaylistsText.visibility = View.VISIBLE
                 }
             }
         }

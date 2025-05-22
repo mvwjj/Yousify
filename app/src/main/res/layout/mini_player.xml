@@ -12,9 +12,9 @@
         android:id="@+id/miniPlayerCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:visibility="gone"
         app:cardCornerRadius="16dp"
         app:cardElevation="8dp"
-        android:visibility="gone"
         tools:visibility="visible">
 
         <androidx.constraintlayout.widget.ConstraintLayout

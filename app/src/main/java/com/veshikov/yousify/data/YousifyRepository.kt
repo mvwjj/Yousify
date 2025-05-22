@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.map
 import com.veshikov.yousify.youtube.NewPipeHelper
 import com.veshikov.yousify.youtube.SearchEngine
 import androidx.room.withTransaction
-import com.veshikov.yousify.auth.AuthManager
-import com.veshikov.yousify.data.SpotifyApiWrapper
+// import com.veshikov.yousify.auth.AuthManager // Не используется напрямую здесь
+// import com.veshikov.yousify.data.SpotifyApiWrapper // Уже импортирован и используется через getInstance
 
 class YousifyRepository(private val ctx: Context) {
     private val db = YousifyDatabase.getInstance(ctx)
@@ -21,8 +21,9 @@ class YousifyRepository(private val ctx: Context) {
     fun getTracks(playlistId: String): Flow<List<TrackEntity>> = trackDao.getTracksForPlaylist(playlistId)
 
     suspend fun syncPlaylistsAndTracks() = db.withTransaction {
-        // Получаем плейлисты пользователя через ваш SpotifyApiWrapper
-        val playlists = SpotifyApiWrapper.getInstance().getUserPlaylists() ?: emptyList()
+        // ИСПРАВЛЕНО: Передаем контекст в getInstance
+        val apiWrapper = SpotifyApiWrapper.getInstance(ctx)
+        val playlists = apiWrapper.getUserPlaylists() ?: emptyList()
         val playlistEntities = playlists.map { playlist ->
             PlaylistEntity(
                 id = playlist.id,
@@ -30,39 +31,55 @@ class YousifyRepository(private val ctx: Context) {
                 owner = playlist.owner?.displayName ?: ""
             )
         }
-        val oldPlaylists = playlistDao.getAllPlaylists().first()
+        // Ensure database operations are on the correct dispatcher if needed, though withTransaction handles this.
+        val oldPlaylists = playlistDao.getAllPlaylists().first() // .first() может быть блокирующим, убедитесь, что это IO
         val toDelete = oldPlaylists.filter { oldPlaylist -> playlistEntities.none { newPlaylist -> newPlaylist.id == oldPlaylist.id } }
+
+        // Удаляем старые плейлисты ПЕРЕД вставкой новых, чтобы избежать конфликтов при замене,
+        // если OnConflictStrategy.REPLACE не обрабатывает каскадное удаление зависимых треков так, как ожидается.
+        // Однако, если PlaylistEntity.id это primary key и OnConflictStrategy.REPLACE, то порядок может быть не так важен
+        // для самих плейлистов, но важен для треков.
+        toDelete.forEach { playlistDao.delete(it) } // Это вызовет каскадное удаление треков, если настроено
         playlistDao.insertAll(playlistEntities)
-        toDelete.forEach { playlistDao.delete(it) }
+
 
         val allPlaylistIds = playlistEntities.map { it.id }
+        // Получаем существующие треки ПОСЛЕ возможного удаления плейлистов (и их треков через CASCADE)
+        // и ПЕРЕД вставкой новых, чтобы правильно определить toDeleteTrackIds
         val existingTracks = trackDao.getTracksForPlaylistIds(allPlaylistIds)
         val newTracks = mutableListOf<TrackEntity>()
+
         for (playlist in playlists) {
-            val tracks = SpotifyApiWrapper.getInstance().getPlaylistTracks(playlist.id) ?: emptyList()
+            // ИСПРАВЛЕНО: Передаем контекст в getInstance
+            val tracks = apiWrapper.getPlaylistTracks(playlist.id) ?: emptyList()
             tracks.forEach { trackItem ->
                 val track = trackItem.track ?: return@forEach
-                newTracks.add(
-                    TrackEntity(
-                        id = track.id ?: return@forEach,
-                        playlistId = playlist.id,
-                        title = track.name ?: "",
-                        artist = track.artists?.joinToString(", ") { artist -> artist.name ?: "" } ?: "",
-                        isrc = track.externalIds?.get("isrc"),
-                        durationMs = track.durationMs ?: 0L
+                track.id?.let { trackId -> // Проверяем track.id на null
+                    newTracks.add(
+                        TrackEntity(
+                            id = trackId,
+                            playlistId = playlist.id,
+                            title = track.name ?: "",
+                            artist = track.artists?.joinToString(", ") { artist -> artist.name ?: "" } ?: "",
+                            isrc = track.externalIds?.get("isrc"),
+                            durationMs = track.durationMs ?: 0L
+                        )
                     )
-                )
+                }
             }
         }
         val newTrackIds = newTracks.map { it.id }.toSet()
-        val toDeleteTrackIds = existingTracks.filter { it.id !in newTrackIds }.map { it.id }
+        // Определяем треки для удаления: те, что были в БД для актуальных плейлистов, но не пришли из API
+        val toDeleteTrackIds = existingTracks.filter { it.id !in newTrackIds && allPlaylistIds.contains(it.playlistId) }.map { it.id }
+
         if (toDeleteTrackIds.isNotEmpty()) trackDao.deleteByIds(toDeleteTrackIds)
-        trackDao.insertAll(newTracks)
+        if (newTracks.isNotEmpty()) trackDao.insertAll(newTracks) // Вставляем только если есть что вставлять
     }
 
     suspend fun getOrSearchYoutubeId(track: TrackEntity): YtTrackCacheEntity? {
         ytTrackCacheDao.getBySpotifyId(track.id)?.let { return it }
-        val result = SearchEngine.findBestYoutube(track) ?: return null
+        // ИСПРАВЛЕНО: передаем контекст в SearchEngine.findBestYoutube, если он там нужен для инициализации
+        val result = SearchEngine.findBestYoutube(track, ctx) ?: return null
         val audioUrl = NewPipeHelper.getBestAudioUrl(result.videoId)
         val cached   = result.copy(audioUrl = audioUrl)
         ytTrackCacheDao.insert(cached)

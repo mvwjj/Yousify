@@ -1,34 +1,59 @@
 package com.veshikov.yousify.auth
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.veshikov.yousify.utils.Logger
 
 object SecurePrefs {
-    private const val FILE = "auth_secure_prefs"
-    private const val KEY_ACCESS  = "access_token"
-    private const val KEY_REFRESH = "refresh_token"
-    private const val KEY_EXPIRY  = "expires_at"
+    private const val FILE_NAME = "yousify_secure_auth_prefs"
+    private const val KEY_ACCESS_TOKEN = "access_token"
+    private const val KEY_REFRESH_TOKEN = "refresh_token"
+    private const val KEY_EXPIRES_AT = "expires_at"
 
-    private fun prefs(ctx: Context) = EncryptedSharedPreferences.create(
-        ctx,
-        FILE,
-        MasterKey.Builder(ctx).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private fun getEncryptedPrefs(context: Context): SharedPreferences {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
 
-    fun save(access: String, refresh: String, expiresInSec: Long, ctx: Context) {
-        val ts = System.currentTimeMillis() + expiresInSec * 1000
-        prefs(ctx).edit().apply {
-            putString(KEY_ACCESS, access)
-            putString(KEY_REFRESH, refresh)
-            putLong(KEY_EXPIRY, ts)
-        }.apply()
+        return EncryptedSharedPreferences.create(
+            context,
+            FILE_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
     }
 
-    fun access(ctx: Context)  = prefs(ctx).getString(KEY_ACCESS, null)
-    fun refresh(ctx: Context) = prefs(ctx).getString(KEY_REFRESH, null)
-    fun expiresAt(ctx: Context)= prefs(ctx).getLong(KEY_EXPIRY, 0)
-    fun clear(ctx: Context)    = prefs(ctx).edit().clear().apply()
+    fun save(accessToken: String, refreshToken: String, expiresInSeconds: Long, context: Context) {
+        val editor = getEncryptedPrefs(context).edit()
+        editor.putString(KEY_ACCESS_TOKEN, accessToken)
+        editor.putString(KEY_REFRESH_TOKEN, refreshToken)
+        val MOCK_EXPIRES_AT = System.currentTimeMillis() + (expiresInSeconds * 1000) // Для примера, реальное время истечения
+        editor.putLong(KEY_EXPIRES_AT, MOCK_EXPIRES_AT)
+        editor.apply()
+        Logger.i("SecurePrefs: Tokens saved. Access token ends with ${accessToken.takeLast(5)}, Refresh token ends with ${refreshToken.takeLast(5)}")
+    }
+
+    fun accessToken(context: Context): String? {
+        val token = getEncryptedPrefs(context).getString(KEY_ACCESS_TOKEN, null)
+        // Logger.d("SecurePrefs: Retrieved access token: ${token != null}")
+        return token
+    }
+
+    fun refreshToken(context: Context): String? {
+        val token = getEncryptedPrefs(context).getString(KEY_REFRESH_TOKEN, null)
+        // Logger.d("SecurePrefs: Retrieved refresh token: ${token != null}")
+        return token
+    }
+
+    fun expiresAt(context: Context): Long {
+        return getEncryptedPrefs(context).getLong(KEY_EXPIRES_AT, 0L)
+    }
+
+    fun clear(context: Context) {
+        getEncryptedPrefs(context).edit().clear().apply()
+        Logger.i("SecurePrefs: Cleared all tokens.")
+    }
 }

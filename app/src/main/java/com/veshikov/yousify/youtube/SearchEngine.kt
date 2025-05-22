@@ -40,12 +40,29 @@ object SearchEngine {
     fun initialize(context: Context) {
         if (!isInitialized) {
             try {
-                sbertModel = SbertModel(context)
-                audioFingerprint = AudioFingerprint(context)
+                // Пробуем инициализировать SBERT модель, но продолжаем работу даже если не удалось
+                try {
+                    sbertModel = SbertModel(context)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to initialize SBERT model: ${e.message}")
+                    // Продолжаем работу без SBERT модели
+                }
+                
+                // Пробуем инициализировать AudioFingerprint
+                try {
+                    audioFingerprint = AudioFingerprint(context)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to initialize AudioFingerprint: ${e.message}")
+                    // Продолжаем работу без AudioFingerprint
+                }
+                
+                // Считаем инициализацию успешной в любом случае
                 isInitialized = true
-                Log.i(TAG, "SearchEngine initialized successfully")
+                Log.i(TAG, "SearchEngine initialized (some components may be unavailable)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize SearchEngine: ${e.message}")
+                // Даже при полной ошибке инициализации, мы все равно будем пытаться искать треки
+                isInitialized = true
             }
         }
     }

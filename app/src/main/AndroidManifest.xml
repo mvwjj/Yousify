@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    
+
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" /> <!-- Для API < 33 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> <!-- Для API 33+ (TIRAMISU) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
 
     <application
         android:name="com.veshikov.yousify.SpotifyApplication"
@@ -18,11 +21,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Yousify"
         tools:targetApi="31">
-        
+
         <activity
             android:name="com.veshikov.yousify.ui.MainActivity"
             android:exported="true"
-            android:supportsPictureInPicture="true">
+            android:supportsPictureInPicture="true"
+            android:windowSoftInputMode="adjustResize"> <!-- Добавлено для лучшей работы с клавиатурой -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -38,20 +42,34 @@
                     android:scheme="${redirectSchemeName}" />
             </intent-filter>
         </activity>
-        
+
         <activity
             android:name="com.veshikov.yousify.ui.PlaylistActivity"
             android:exported="false" />
-            
+
         <activity
             android:name="com.veshikov.yousify.ui.TracksActivity"
-            android:exported="false" />
-        
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" /> <!-- Добавлено для лучшей работы с клавиатурой -->
+
         <service
             android:name="com.veshikov.yousify.player.YtAudioService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback"
-            android:permission="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+            android:foregroundServiceType="mediaPlayback" />
+        <!-- Разрешение android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK неявно добавляется для foregroundServiceType="mediaPlayback" на API 34+
+             Для API < 34, если targetSdk 34+, то нужно также android.permission.FOREGROUND_SERVICE.
+             Но так как minSdk 24, и для поддержки старых версий, оставляем его, если FOREGROUND_SERVICE_MEDIA_PLAYBACK специфичен для более новых API.
+             Однако, документация говорит, что FOREGROUND_SERVICE_MEDIA_PLAYBACK достаточен для mediaPlayback. -->
+
+        <!-- Регистрация YtAudioPlayer -->
+        <service
+            android:name="com.veshikov.yousify.player.YtAudioPlayer"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <!-- Как и для YtAudioService, foregroundServiceType="mediaPlayback" должен быть достаточен. -->
+        <!-- android:permission здесь не требуется, так как доступ к сервису не предполагается из других приложений -->
+
+
     </application>
 
 </manifest>

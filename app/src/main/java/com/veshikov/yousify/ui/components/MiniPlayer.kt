@@ -31,6 +31,7 @@ import com.veshikov.yousify.ui.components.MiniPlayerUiState.*
 /**
  * Мини-плеер, который можно развернуть в bottom sheet
  */
+@androidx.media3.common.util.UnstableApi
 @Composable
 fun MiniPlayer(
     state: MiniPlayerState,
