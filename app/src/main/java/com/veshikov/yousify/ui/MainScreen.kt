@@ -1,10 +1,11 @@
 package com.veshikov.yousify.ui
 
 import android.app.Activity
+import android.app.Application
+import android.app.PictureInPictureParams
 import android.content.Context
-import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -13,26 +14,62 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.CircularProgressIndicator // Material 2
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.* // Material 3 components
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-// import androidx.compose.ui.res.painterResource // Не используется в этом файле напрямую
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+// import androidx.compose.ui.unit.sp // sp импортируется из MaterialTheme.typography
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -41,72 +78,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import coil.compose.AsyncImage
-// import com.veshikov.yousify.R // Не используется в этом файле напрямую
-import com.veshikov.yousify.auth.SecurePrefs // ИСПРАВЛЕНО: импорт SecurePrefs
+import com.veshikov.yousify.R
+import com.veshikov.yousify.auth.AuthManager
+import com.veshikov.yousify.auth.SecurePrefs
 import com.veshikov.yousify.auth.SpotifyAuthManager
-import com.veshikov.yousify.data.SpotifyApiWrapper
 import com.veshikov.yousify.data.model.PlaylistEntity
 import com.veshikov.yousify.data.model.TrackEntity
 import com.veshikov.yousify.player.MiniPlayerController
-// import com.veshikov.yousify.player.YtAudioService // Не используется в этом файле напрямую
 import com.veshikov.yousify.ui.components.MiniPlayer
 import com.veshikov.yousify.ui.components.MiniPlayerState
+import com.veshikov.yousify.ui.viewmodel.YousifyViewModelFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
-import android.app.PictureInPictureParams
-
-// suspend функция для обмена кода на токен
-suspend fun exchangeCodeForToken(code: String, codeVerifier: String, context: Context): String? { // context уже есть
-    Log.i("YousifyAuth", "EXCHANGE_TOKEN_START: code=$code codeVerifier=$codeVerifier")
-    return withContext(Dispatchers.IO) {
-        try {
-            val url = URL("https://accounts.spotify.com/api/token")
-            val postData = "grant_type=authorization_code" +
-                    "&code=" + URLEncoder.encode(code, "UTF-8") +
-                    "&redirect_uri=" + URLEncoder.encode(SpotifyAuthManager.REDIRECT_URI, "UTF-8") +
-                    "&client_id=" + URLEncoder.encode(SpotifyAuthManager.CLIENT_ID, "UTF-8") +
-                    "&code_verifier=" + URLEncoder.encode(codeVerifier, "UTF-8")
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.doOutput = true
-            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-            conn.outputStream.use { it.write(postData.toByteArray()) }
-            val responseCode = conn.responseCode
-            val responseBody = if (responseCode in 200..299) {
-                conn.inputStream.bufferedReader().use { it.readText() }
-            } else {
-                conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
-            }
-            Log.i("YousifyAuth", "TOKEN_RESPONSE: code=$responseCode body=$responseBody")
-            if (responseCode == 200) {
-                val jsonResponse = JSONObject(responseBody)
-                val accessToken = jsonResponse.optString("access_token", null)
-                val refreshToken = jsonResponse.optString("refresh_token", null)
-                val expiresIn = jsonResponse.optLong("expires_in", 3600)
-
-                Log.i("YousifyAuth", "TOKEN_PARSED: access=${accessToken?.take(10)}..., refresh=${refreshToken?.take(5)}..., expires=$expiresIn")
-
-                if (accessToken != null && refreshToken != null) {
-                    SecurePrefs.save(accessToken, refreshToken, expiresIn, context) // ИСПРАВЛЕНО
-                    Log.i("YousifyAuth", "TOKENS_SAVED_TO_SECURE_PREFS")
-                }
-                accessToken
-            } else {
-                Log.e("YousifyAuth", "TOKEN_ERROR: $responseCode $responseBody")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e("YousifyAuth", "TOKEN_EXCEPTION: ${e.message}", e)
-            null
-        }
-    }
-}
 
 sealed class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
     object Playlists : BottomNavItem("playlists", "Playlists", Icons.Filled.LibraryMusic)
@@ -114,13 +98,30 @@ sealed class BottomNavItem(val route: String, val label: String, val icon: Image
     object Settings : BottomNavItem("settings", "Settings", Icons.Filled.Settings)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun MainScreen(appViewModel: YousifyViewModel = viewModel()) {
+fun MainScreen(
+    appViewModel: YousifyViewModel = viewModel(
+        factory = YousifyViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = LocalContext.current as? Activity
 
-    val miniPlayerController = remember {
+    var authed by remember { mutableStateOf(SecurePrefs.accessToken(context) != null) }
+
+    LaunchedEffect(Unit) {
+        appViewModel.isUserLoggedIn.collect { isLoggedIn ->
+            authed = isLoggedIn
+            if (isLoggedIn && appViewModel.playlists.value.isEmpty()) {
+                appViewModel.loadPlaylistsFromDb()
+            }
+        }
+    }
+
+    val miniPlayerController = remember(context, lifecycleOwner, appViewModel) {
         MiniPlayerController(
             context = context,
             lifecycleOwner = lifecycleOwner,
@@ -131,84 +132,39 @@ fun MainScreen(appViewModel: YousifyViewModel = viewModel()) {
             }
         )
     }
-    val activity = context as? Activity
-    // ИСПРАВЛЕНО: Передаем контекст
-    val apiWrapper = remember { SpotifyApiWrapper.getInstance(context) }
-
-    // ИСПРАВЛЕНО: SecurePrefs.accessToken вместо SecurePrefs.access
-    val initialAccessToken = remember { SecurePrefs.accessToken(context) }
-    var authed by remember { mutableStateOf(apiWrapper.getAccessToken() != null || initialAccessToken != null) }
-
-    LaunchedEffect(initialAccessToken, apiWrapper.getAccessToken(), authed) { // Добавил authed в key, чтобы перезапускать при его изменении
-        val currentApiToken = apiWrapper.getAccessToken()
-        if (currentApiToken != null && !authed) { // Если токен уже в wrapper, но authed еще false
-            authed = true
-            appViewModel.syncSpotifyData()
-            appViewModel.loadPlaylistsFromDb()
-        } else if (initialAccessToken != null && currentApiToken == null) { // Если есть сохраненный, но не в wrapper
-            Log.i("MainScreen", "Initializing API with saved token from SecurePrefs")
-            // ИСПРАВЛЕНО: передаем refresh token из SecurePrefs
-            val success = apiWrapper.initializeApiWithToken(initialAccessToken, SecurePrefs.refreshToken(context))
-            if (success) {
-                Log.i("MainScreen", "API initialized successfully with saved token")
-                authed = true // Устанавливаем authed
-                appViewModel.syncSpotifyData()
-                appViewModel.loadPlaylistsFromDb()
-            } else {
-                Log.e("MainScreen", "Failed to initialize API with saved token")
-                SecurePrefs.clear(context) // ИСПРАВЛЕНО
-                authed = false
-            }
-        } else if (currentApiToken != null && authed) { // Если токен в wrapper и мы авторизованы
-            if (appViewModel.playlists.value.isEmpty()) {
-                appViewModel.loadPlaylistsFromDb() // Загружаем, если плейлисты пусты
-            }
-        } else if (initialAccessToken == null && currentApiToken == null) { // Если токенов нет нигде
-            authed = false
+    DisposableEffect(Unit) {
+        onDispose {
+            miniPlayerController.release()
         }
     }
 
+    var loadingLogin by remember { mutableStateOf(false) }
+    var loginError by remember { mutableStateOf<String?>(null) }
 
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val authManager = remember {
+    val authManagerHelper = remember(context, activity) {
         SpotifyAuthManager(context) { code ->
-            Log.i("YousifyAuth", "AUTH_CODE: $code")
-            (activity as? ComponentActivity)?.lifecycleScope?.launch {
+            Log.i("YousifyAuth", "AUTH_CODE_RECEIVED: $code")
+            val scope = (activity as? ComponentActivity)?.lifecycleScope ?: lifecycleOwner.lifecycleScope
+            scope.launch {
                 val prefs = context.getSharedPreferences(SpotifyAuthManager.PREFS_NAME, Context.MODE_PRIVATE)
                 val codeVerifier = prefs.getString(SpotifyAuthManager.CODE_VERIFIER_KEY, null)
-                Log.i("YousifyAuth", "CODE_VERIFIER: $codeVerifier")
+                Log.i("YousifyAuth", "STORED_CODE_VERIFIER: $codeVerifier")
                 if (codeVerifier != null) {
-                    loading = true
-                    error = null
-                    val token = exchangeCodeForToken(code, codeVerifier, context) // context уже передается
-                    Log.i("YousifyAuth", "TOKEN_EXCHANGE: ${token?.take(10)}...")
-                    if (token != null) {
-                        // ИСПРАВЛЕНО: передаем refresh token (который должен был сохраниться в exchangeCodeForToken)
-                        val success = apiWrapper.initializeApiWithToken(token, SecurePrefs.refreshToken(context))
-                        Log.i("YousifyAuth", "API_INIT_OK: $success")
-                        if (success) {
-                            loading = false
-                            error = null
-                            authed = true // Устанавливаем authed здесь
-                            // appViewModel.syncSpotifyData() // Запуск синхронизации после успешной авторизации
-                            // appViewModel.loadPlaylistsFromDb()
-                        } else {
-                            loading = false
-                            error = "Error initializing Spotify API after token exchange"
-                            authed = false
-                        }
+                    loadingLogin = true
+                    loginError = null
+                    val success = AuthManager.exchangeCodeForTokens(code, codeVerifier, context)
+                    if (success) {
+                        Log.i("YousifyAuth", "TOKEN_EXCHANGE_SUCCESS. Notifying ViewModel.")
+                        appViewModel.userJustLoggedIn()
                     } else {
-                        loading = false
-                        error = "Failed to get accessToken from exchange"
-                        Log.e("YousifyAuth", "TOKEN_ERROR: token is null after exchange")
-                        authed = false
+                        loginError = "Failed to get access token from Spotify."
+                        Log.e("YousifyAuth", "TOKEN_EXCHANGE_FAILED.")
                     }
+                    loadingLogin = false
                 } else {
-                    loading = false
-                    error = "Error: missing code_verifier"
-                    Log.e("YousifyAuth", "TOKEN_ERROR: code_verifier is null")
-                    authed = false
+                    loginError = "Error: Auth session issue (missing verifier)."
+                    Log.e("YousifyAuth", "CODE_VERIFIER_IS_NULL.")
+                    loadingLogin = false
                 }
             }
         }
@@ -216,31 +172,38 @@ fun MainScreen(appViewModel: YousifyViewModel = viewModel()) {
 
     if (!authed) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(32.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Login via Spotify", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text("Login via Spotify", style = MaterialTheme.typography.headlineSmall)
             Spacer(modifier = Modifier.height(24.dp))
-            if (!loading) {
+            if (!loadingLogin) {
                 Button(
                     onClick = {
-                        error = null
-                        // loading = true // loading будет установлено в authManager callback
-                        activity?.let { authManager.startAuth(it) }
+                        loginError = null
+                        activity?.let {
+                            Log.i("MainScreen", "Starting Spotify Auth Flow")
+                            authManagerHelper.startAuth(it)
+                        } ?: run {
+                            Log.e("MainScreen", "Activity context is null, cannot start auth.")
+                            loginError = "Cannot start login process."
+                        }
                     },
-                    enabled = !loading
+                    enabled = !loadingLogin
                 ) {
-                    Text("Login")
+                    Text("Login with Spotify")
                 }
             } else {
-                CircularProgressIndicator(modifier = Modifier.size(40.dp))
+                CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Waiting for authorization...")
             }
-            if (error != null) {
+            loginError?.let {
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(error!!, color = Color.Red)
+                Text(it, color = MaterialTheme.colorScheme.error)
             }
         }
         return
@@ -253,16 +216,16 @@ fun MainScreen(appViewModel: YousifyViewModel = viewModel()) {
         Box(modifier = Modifier
             .fillMaxSize()
             .padding(innerPadding)) {
-            YousifyNavHost(navController, appViewModel, miniPlayerController)
+            YousifyNavHost(navController, appViewModel)
 
-            val miniPlayerCurrentState by miniPlayerController.miniPlayerState.collectAsState()
-            val miniPlayerData by miniPlayerController.miniPlayerData.collectAsState()
-            val isMiniPlayerExpanded by miniPlayerController.isExpanded.collectAsState()
+            val miniPlayerCurrentState by miniPlayerController.miniPlayerState.collectAsStateWithLifecycle()
+            val miniPlayerData by miniPlayerController.miniPlayerData.collectAsStateWithLifecycle()
+            val isMiniPlayerExpanded by miniPlayerController.isExpanded.collectAsStateWithLifecycle()
 
             AnimatedVisibility(
                 visible = miniPlayerCurrentState != MiniPlayerState.HIDDEN && miniPlayerData != null,
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it }),
+                enter = slideInVertically(initialOffsetY = { it / 2 }),
+                exit = slideOutVertically(targetOffsetY = { it / 2 }),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
                 miniPlayerData?.let { data ->
@@ -282,7 +245,10 @@ fun MainScreen(appViewModel: YousifyViewModel = viewModel()) {
 
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun YousifyNavHost(navController: NavHostController, viewModel: YousifyViewModel, miniPlayerController: MiniPlayerController) {
+fun YousifyNavHost(
+    navController: NavHostController,
+    viewModel: YousifyViewModel
+) {
     NavHost(navController, startDestination = BottomNavItem.Playlists.route) {
         composable(BottomNavItem.Playlists.route) {
             PlaylistsScreen(viewModel, navController)
@@ -292,7 +258,7 @@ fun YousifyNavHost(navController: NavHostController, viewModel: YousifyViewModel
             LaunchedEffect(playlistId) {
                 playlistId?.let { viewModel.selectPlaylistForViewing(it) }
             }
-            val tracksForPlaylist by viewModel.tracksForSelectedPlaylist.collectAsState()
+            val tracksForPlaylist by viewModel.tracksForSelectedPlaylist.collectAsStateWithLifecycle()
 
             TracksScreen(
                 tracks = tracksForPlaylist,
@@ -303,17 +269,25 @@ fun YousifyNavHost(navController: NavHostController, viewModel: YousifyViewModel
         }
         composable("track_detail/{trackId}") { backStackEntry ->
             val trackId = backStackEntry.arguments?.getString("trackId")
-            val tracksFromVm by viewModel.tracksForSelectedPlaylist.collectAsState()
+            val tracksFromVm by viewModel.tracksForSelectedPlaylist.collectAsStateWithLifecycle()
             val track = tracksFromVm.find { it.id == trackId }
 
             if (track != null) {
                 TrackDetailScreen(track = track, viewModel = viewModel)
             } else {
-                Text("Track not found (ID: $trackId)")
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Track not found (ID: $trackId)")
+                }
             }
         }
         composable(BottomNavItem.Search.route) {
-            SearchScreen(viewModel = viewModel, navController = navController, miniPlayerController = miniPlayerController)
+            SearchScreen(viewModel = viewModel, navController = navController)
         }
         composable(BottomNavItem.Settings.route) {
             SettingsScreen(viewModel = viewModel)
@@ -352,58 +326,74 @@ fun YousifyBottomBar(navController: NavHostController) {
 
 @Composable
 fun PlaylistsScreen(viewModel: YousifyViewModel, navController: NavHostController) {
-    val playlists by viewModel.playlists.collectAsState()
-    val context = LocalContext.current // Для SpotifyApiWrapper
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        // ИСПРАВЛЕНО: Передаем контекст
-        if (playlists.isEmpty() && SpotifyApiWrapper.getInstance(context).getAccessToken() != null) {
-            viewModel.loadPlaylistsFromDb() // Сначала грузим из БД
-            viewModel.syncSpotifyData()    // Потом синхронизируем
+        if (playlists.isEmpty() && viewModel.isUserLoggedIn.value) {
+            viewModel.loadPlaylistsFromDb()
         }
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Your Playlists", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.playlist), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.weight(1f))
-            Button(onClick = { viewModel.syncSpotifyData() }) {
-                Text("Sync")
+            Button(
+                onClick = { viewModel.syncSpotifyData() },
+                enabled = !isLoadingPlaylists
+            ) {
+                if (isLoadingPlaylists && playlists.isEmpty()) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text(stringResource(R.string.sync))
+                }
             }
         }
-
         Spacer(modifier = Modifier.height(12.dp))
-        // ИСПРАВЛЕНО: Передаем контекст
-        val isLoading = playlists.isEmpty() && SpotifyApiWrapper.getInstance(context).getAccessToken() != null
-        if (isLoading) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(top = 20.dp)) {
-                CircularProgressIndicator() // Material 2
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Loading playlists...", color = Color.Gray)
+
+        if (isLoadingPlaylists && playlists.isEmpty()) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp)
+            ) {
+                Text(stringResource(R.string.loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        } else if (playlists.isEmpty() && SpotifyApiWrapper.getInstance(context).getAccessToken() != null) {
-            Text("No playlists. Try syncing.", color = Color.Gray)
-        } else if (playlists.isNotEmpty()){
+        } else if (playlists.isEmpty()) {
+            Text(
+                "No playlists found. Try syncing or create playlists in Spotify.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = 20.dp)
+            )
+        } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(playlists) { playlist ->
+                items(playlists, key = { it.id }) { playlist ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
                                 navController.navigate("tracks/${playlist.id}")
                             },
-                        elevation = CardDefaults.cardElevation(2.dp)
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(
-                                model = "https://placehold.co/64x64?text=${playlist.name.firstOrNull()?.uppercaseChar() ?: 'P'}",
+                            Icon(
+                                imageVector = Icons.Filled.QueueMusic,
                                 contentDescription = playlist.name,
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text(playlist.name, fontWeight = FontWeight.Bold)
-                                Text("Owner: ${playlist.owner.ifEmpty { "Unknown" }}", color = Color.Gray, fontSize = 12.sp)
+                                Text(playlist.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("Owner: ${playlist.owner.ifEmpty { "Unknown" }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -417,34 +407,47 @@ fun PlaylistsScreen(viewModel: YousifyViewModel, navController: NavHostControlle
 fun TracksScreen(tracks: List<TrackEntity>, onTrackClick: (TrackEntity) -> Unit) {
     if (tracks.isEmpty()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("This playlist has no tracks or they are loading.", color = Color.Gray)
+            Text(stringResource(R.string.no_tracks), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
 
-    LazyColumn(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
-        items(tracks) { track ->
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(tracks, key = { it.id }) { track ->
             Card(modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
                 .clickable { onTrackClick(track) },
-                elevation = CardDefaults.cardElevation(1.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = track.title,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .padding(end = 8.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(track.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        Text(track.artist, color = Color.Gray, fontSize = 12.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text(track.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+                        Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "${track.durationMs / 1000 / 60}:${(track.durationMs / 1000 % 60).toString().padStart(2, '0')}",
                         modifier = Modifier.align(Alignment.CenterVertically),
-                        fontSize = 12.sp,
-                        color = Color.DarkGray
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -455,161 +458,190 @@ fun TracksScreen(tracks: List<TrackEntity>, onTrackClick: (TrackEntity) -> Unit)
 @Composable
 fun TrackDetailScreen(track: TrackEntity, viewModel: YousifyViewModel) {
     val context = LocalContext.current
-    // val loading by remember { mutableStateOf(false) } // loading не используется
-    // val scope = rememberCoroutineScope() // scope не используется
-    val pipSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+    val activity = LocalContext.current as? Activity
     var pipLaunched by remember { mutableStateOf(false) }
 
-    val currentMiniPlayerTrack by viewModel.currentTrack.collectAsState()
-    val isPlayingThisTrackInMiniPlayer = currentMiniPlayerTrack?.id == track.id
+    val currentMiniPlayerTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
+    val miniPlayerActualState by viewModel.miniPlayerState.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text(track.title, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-        Text(track.artist, color = Color.Gray)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("ISRC: ${track.isrc ?: "-"}")
-        Text("Duration: ${track.durationMs / 1000}s")
+    val isPlayingThisTrackInMiniPlayer = currentMiniPlayerTrack?.id == track.id && miniPlayerActualState == MiniPlayerState.PLAYING
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(track.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium)
+        Text(track.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(16.dp))
+        Text("ISRC: ${track.isrc ?: "-"}", style = MaterialTheme.typography.bodyMedium)
+        Text("Duration: ${track.durationMs / 1000}s", style = MaterialTheme.typography.bodyMedium)
+        Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = {
-                // Логика play/pause должна учитывать текущее состояние плеера, а не только isPlayingThisTrackInMiniPlayer
-                // Эта логика уже есть в ViewModel и MiniPlayerController
-                if (currentMiniPlayerTrack?.id == track.id) { // Если этот трек уже текущий в плеере
-                    // viewModel.togglePlayPause() // Нужен такой метод в ViewModel/Controller или используем существующие
-                    val currentPlayerData = viewModel.playbackCommand // Это SharedFlow, нужна актуализация состояния плеера
-                    // Для простоты, если трек текущий, то либо пауза, либо возобновление
-                    // Правильнее будет получать актуальное состояние (PLAYING/PAUSED) из MiniPlayerController
-                    // Но здесь мы отправляем команды в ViewModel
-                    if (/* MiniPlayerController.uiState.getStateFlow().value == MiniPlayerState.PLAYING */ false) { // Заглушка, т.к. нет прямого доступа
+                if (currentMiniPlayerTrack?.id == track.id) {
+                    if (miniPlayerActualState == MiniPlayerState.PLAYING) {
                         viewModel.pauseCurrentTrack()
                     } else {
                         viewModel.resumeCurrentTrack()
                     }
-                } else { // Если это другой трек или плеер пуст
+                } else {
                     viewModel.playTrackInContext(track, listOf(track))
                 }
             }
-            // enabled = !loading // loading не используется
         ) {
-            // Текст кнопки должен зависеть от реального состояния плеера для этого трека
-            Text(if (isPlayingThisTrackInMiniPlayer /* && MiniPlayerController.isPlaying */) "Pause" else "Play")
+            Text(if (isPlayingThisTrackInMiniPlayer) stringResource(R.string.pause) else stringResource(R.string.play))
         }
 
-        if (pipSupported) {
-            Spacer(modifier = Modifier.height(8.dp))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity != null && activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+            Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = {
-                if (context is Activity) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     try {
-                        if (!context.isInPictureInPictureMode) {
+                        if (!activity.isInPictureInPictureMode) {
                             val params = PictureInPictureParams.Builder().build()
-                            context.enterPictureInPictureMode(params)
-                            pipLaunched = true
+                            val entered = activity.enterPictureInPictureMode(params)
+                            if(entered) pipLaunched = true
+                            else Log.w("TrackDetailScreen", "Failed to enter PiP mode via activity method.")
                         }
                     } catch (e: Exception) {
-                        Log.e("Yousify", "[TrackDetailScreen] Error entering PiP mode: ${e.message}", e)
+                        Log.e("TrackDetailScreen", "Error entering PiP mode: ${e.message}", e)
                         Toast.makeText(context, "Error entering PiP mode", Toast.LENGTH_SHORT).show()
                     }
                 }
             }) {
-                Text("Enter PiP Mode")
+                Text("Enter Picture-in-Picture")
             }
         }
     }
-    if (pipLaunched) { BackHandler { /* ... */ } }
+
+    if (pipLaunched && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity != null) {
+        BackHandler {
+            pipLaunched = false
+        }
+    }
 }
 
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun SearchScreen(viewModel: YousifyViewModel, navController: NavHostController, miniPlayerController: MiniPlayerController) {
-    val allPlaylists by viewModel.playlists.collectAsState()
+fun SearchScreen(
+    viewModel: YousifyViewModel,
+    navController: NavHostController
+) {
+    val allPlaylists by viewModel.playlists.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
 
-    val filteredPlaylists = allPlaylists.filter {
-        it.name.contains(query, ignoreCase = true) || it.owner.contains(query, ignoreCase = true)
-    }
+    // ВЫНОСИМ СЮДА: tracksOfCurrentContext должен быть получен в Composable контексте SearchScreen
+    val tracksOfCurrentContext by viewModel.tracksForSelectedPlaylist.collectAsStateWithLifecycle()
 
-    val tracksOfCurrentPlaylist by viewModel.tracksForSelectedPlaylist.collectAsState() // Это треки последнего просмотренного плейлиста
-    val filteredTracks = tracksOfCurrentPlaylist.filter { // Фильтруем треки из этого контекста
-        it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true)
-    }
-
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Search", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .padding(16.dp)
+    ) {
+        Text(stringResource(R.string.search), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Search playlists, tracks, or artists") },
-            modifier = Modifier.fillMaxWidth()
+            label = { Text("Search playlists, tracks, artists") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search Icon") }
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (query.isNotBlank()) {
-            Text("Found Playlists", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-            if (filteredPlaylists.isNotEmpty()) {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.heightIn(max = 200.dp) // Ограничиваем высоту списка
-                ) {
-                    items(filteredPlaylists) { playlist ->
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            if (query.isNotBlank()) {
+                val filteredPlaylists = allPlaylists.filter {
+                    it.name.contains(query, ignoreCase = true) || it.owner.contains(query, ignoreCase = true)
+                }
+                item {
+                    Text("Found Playlists (${filteredPlaylists.size})", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (filteredPlaylists.isNotEmpty()) {
+                    items(filteredPlaylists, key = { "playlist-${it.id}" }) { playlist ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(vertical = 4.dp)
                                 .clickable { navController.navigate("tracks/${playlist.id}") },
                             elevation = CardDefaults.cardElevation(1.dp)
                         ) {
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                AsyncImage(
-                                    model = "https://placehold.co/48x48?text=${playlist.name.firstOrNull()?.uppercaseChar() ?: 'P'}",
+                                Icon(
+                                    imageVector = Icons.Filled.QueueMusic,
                                     contentDescription = playlist.name,
-                                    modifier = Modifier.size(40.dp)
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .padding(end = 8.dp),
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(playlist.name, fontWeight = FontWeight.Medium)
-                                Spacer(modifier = Modifier.weight(1f))
-                                Text("(${playlist.owner})", color = Color.Gray, fontSize = 12.sp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(playlist.name, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyLarge)
+                                    Text(playlist.owner, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                }
                             }
                         }
                     }
+                } else {
+                    item {
+                        Text("No playlists found.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+                    }
                 }
-            } else {
-                Text("No playlists found.", color = Color.Gray, modifier = Modifier.padding(vertical = 8.dp))
-            }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Found Tracks (in current/last playlist)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-            if (filteredTracks.isNotEmpty()) {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.heightIn(max = 300.dp) // Ограничиваем высоту списка
-                ) {
-                    items(filteredTracks) { track ->
+                // Используем tracksOfCurrentContext, который уже получен
+                val filteredTracks = tracksOfCurrentContext.filter {
+                    it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true)
+                }
+                item {
+                    Text("Found Tracks in current context (${filteredTracks.size})", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (filteredTracks.isNotEmpty()) {
+                    items(filteredTracks, key = { "track-${it.id}" }) { track ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.playTrackInContext(track, tracksOfCurrentPlaylist) }, // Передаем контекст текущего плейлиста
+                                .padding(vertical = 4.dp)
+                                .clickable { viewModel.playTrackInContext(track, tracksOfCurrentContext) },
                             elevation = CardDefaults.cardElevation(1.dp)
                         ) {
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Filled.MusicNote,
+                                    contentDescription = track.title,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .padding(end = 8.dp),
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(track.title, fontWeight = FontWeight.Medium)
-                                    Text(track.artist, color = Color.Gray, fontSize = 12.sp)
+                                    Text(track.title, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyLarge)
+                                    Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                                 }
                                 Text(
                                     text = "${track.durationMs / 1000 / 60}:${(track.durationMs / 1000 % 60).toString().padStart(2, '0')}",
-                                    fontSize = 12.sp,
-                                    color = Color.DarkGray
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
+                } else {
+                    item {
+                        Text("No tracks found in the current context.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+                    }
                 }
             } else {
-                Text("No tracks found in the current context.", color = Color.Gray, modifier = Modifier.padding(vertical = 8.dp))
+                item {
+                    Text("Enter a query to search.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
+                }
             }
-        } else {
-            Text("Enter a query to search.", color = Color.Gray, modifier = Modifier.padding(top = 16.dp))
         }
     }
 }
@@ -618,49 +650,78 @@ fun SearchScreen(viewModel: YousifyViewModel, navController: NavHostController, 
 fun SettingsScreen(viewModel: YousifyViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Settings", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(onClick = {
-            Log.i("Yousify", "[Settings] Sync button pressed")
-            viewModel.syncSpotifyData()
-            Toast.makeText(context, "Synchronization started...", Toast.LENGTH_SHORT).show()
-        }) {
-            Text("Sync with Spotify")
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(16.dp)) {
+        Text(stringResource(R.string.settings), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                Log.i("YousifySettings", "[Settings] Sync button pressed")
+                viewModel.syncSpotifyData()
+            },
+            enabled = !isSyncing
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Syncing...")
+                } else {
+                    Icon(Icons.Filled.Sync, contentDescription = "Sync Icon", modifier = Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.sync))
+                }
+            }
         }
         Spacer(modifier = Modifier.height(16.dp))
+
         Button(onClick = {
-            scope.launch(Dispatchers.IO) {
+            scope.launch {
                 try {
-                    val ytCacheDb = com.veshikov.yousify.data.model.YousifyDatabase.getInstance(context)
-                    ytCacheDb.ytTrackCacheDao().clearAll()
-
-                    val searchCacheDb = com.veshikov.yousify.youtube.SearchCacheDatabase.getInstance(context)
-                    searchCacheDb.searchCacheDao().deleteOlderThan(System.currentTimeMillis()) // Очищает весь кэш
-
-                    val sbCacheDb = com.veshikov.yousify.player.SponsorBlockDatabase.getInstance(context)
-                    // sbCacheDb.sponsorBlockDao().clearAll() // TODO: Реализовать clearAll если нужно, или удалять по времени
-                    val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000)
-                    // sbCacheDb.sponsorBlockDao().deleteOlderThan(oneWeekAgo) // Если есть такой метод
-                    // Пока нет метода clearAll() в SponsorBlockDao
-
+                    viewModel.clearYouTubeCaches()
                     withContext(Dispatchers.Main) {
-                        Log.i("Yousify", "[Settings] Cleared YouTube related caches (SponsorBlock partially or not cleared)")
-                        Toast.makeText(context, "YouTube caches cleared (SponsorBlock might require manual clear or has no full clear method)", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "YouTube related caches cleared", Toast.LENGTH_LONG).show()
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
-                        Log.e("Yousify", "[Settings] Error clearing caches", e)
+                        Log.e("YousifySettings", "[Settings] Error clearing caches", e)
                         Toast.makeText(context, "Error clearing cache", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
         }) {
-            Text("Clear YouTube Caches")
+            Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear Cache Icon", modifier = Modifier.size(ButtonDefaults.IconSize))
+            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+            Text(stringResource(R.string.clear_cache))
         }
         Spacer(modifier = Modifier.height(24.dp))
-        Text("About App", style = MaterialTheme.typography.titleMedium)
+
+        Button(
+            onClick = {
+                scope.launch {
+                    viewModel.logout()
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        ) {
+            Icon(Icons.Filled.Logout, contentDescription = "Logout Icon", modifier = Modifier.size(ButtonDefaults.IconSize), tint = MaterialTheme.colorScheme.onErrorContainer)
+            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+            Text("Logout from Spotify", color = MaterialTheme.colorScheme.onErrorContainer)
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.about), style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Yousify — your music companion for Spotify and YouTube.", style = MaterialTheme.typography.bodyMedium)
+        // Убедитесь, что R.string.app_info определен в strings.xml.
+        // Это была строка 580 в старом логе ошибки, убедимся что MaterialTheme.typography теперь корректно из M3
+        Text(stringResource(R.string.app_info), style = MaterialTheme.typography.bodyMedium)
     }
 }

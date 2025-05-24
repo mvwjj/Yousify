@@ -6,14 +6,14 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.MaterialTheme // Используем Material 2, так как YouSifyTheme на его основе
-import androidx.compose.material.Surface // Используем Material 2, так как YouSifyTheme на его основе
+import androidx.compose.material3.MaterialTheme // ИЗМЕНЕНО: Material 3
+import androidx.compose.material3.Surface // ИЗМЕНЕНО: Material 3
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.veshikov.yousify.auth.SecurePrefs
 import com.veshikov.yousify.auth.SpotifyAuthManager
 import com.veshikov.yousify.data.SpotifyApiWrapper
-import com.veshikov.yousify.ui.theme.YouSifyTheme // Ваша тема
+import com.veshikov.yousify.ui.theme.YouSifyTheme // Ваша обновленная M3 тема
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -26,16 +26,16 @@ import org.json.JSONObject
 @androidx.media3.common.util.UnstableApi
 class MainActivity : ComponentActivity() {
     private lateinit var authManager: SpotifyAuthManager
-    private lateinit var apiWrapper: SpotifyApiWrapper // Инициализируем в onCreate
+    private lateinit var apiWrapper: SpotifyApiWrapper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        apiWrapper = SpotifyApiWrapper.getInstance(applicationContext) // Передаем контекст
+        apiWrapper = SpotifyApiWrapper.getInstance(applicationContext)
 
         lifecycleScope.launch {
             try {
                 val accessToken = SecurePrefs.accessToken(this@MainActivity)
-                val refreshToken = SecurePrefs.refreshToken(this@MainActivity) // Также получаем refresh token
+                val refreshToken = SecurePrefs.refreshToken(this@MainActivity)
                 if (accessToken != null) {
                     Log.i("MainActivity", "Initializing API with saved token")
                     apiWrapper.initializeApiWithToken(accessToken, refreshToken)
@@ -46,15 +46,12 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            YouSifyTheme { // Ваша тема Material 2
-                Surface( // Surface из Material 2
+            YouSifyTheme { // Ваша обновленная M3 тема
+                Surface( // Surface из androidx.compose.material3.Surface
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colors.background // Material 2 colors
+                    color = MaterialTheme.colorScheme.background // ИЗМЕНЕНО: M3 colorScheme
                 ) {
-                    MainScreen() // MainScreen теперь использует Material 3 компоненты
-                    // Это может вызвать проблемы со смешиванием тем.
-                    // Либо MainScreen тоже должен быть Material 2, либо YouSifyTheme должна быть Material 3.
-                    // Для простоты пока оставляем так, но это потенциальный источник проблем с UI.
+                    MainScreen()
                 }
             }
         }
@@ -64,12 +61,13 @@ class MainActivity : ComponentActivity() {
                 val prefs = getSharedPreferences(SpotifyAuthManager.PREFS_NAME, Context.MODE_PRIVATE)
                 val codeVerifier = prefs.getString(SpotifyAuthManager.CODE_VERIFIER_KEY, null)
                 if (codeVerifier != null) {
-                    val tokenResponse = exchangeCodeForTokenAuth(code, codeVerifier) // Используем новую функцию
+                    val tokenResponse = exchangeCodeForTokenAuth(code, codeVerifier)
                     if (tokenResponse != null) {
                         val ok = apiWrapper.initializeApiWithToken(tokenResponse.accessToken, tokenResponse.refreshToken)
                         if (ok) {
                             Log.i("MainActivity", "Вы успешно авторизированы")
                             // Можно триггернуть обновление UI или синхронизацию данных здесь
+                            // Например, через ViewModel, если MainScreen его использует для состояния логина
                         } else {
                             Log.e("MainActivity", "Ошибка инициализации Spotify API")
                         }
@@ -83,10 +81,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Структура для хранения пары токенов
     data class TokenResponse(val accessToken: String, val refreshToken: String, val expiresIn: Long)
 
-    // Обновленная функция обмена кода, возвращает TokenResponse
     private suspend fun exchangeCodeForTokenAuth(code: String, codeVerifier: String): TokenResponse? = withContext(Dispatchers.IO) {
         try {
             val url = URL("https://accounts.spotify.com/api/token")
@@ -113,12 +109,12 @@ class MainActivity : ComponentActivity() {
             if (responseCode == 200) {
                 val jsonResponse = JSONObject(responseBody)
                 val accessToken = jsonResponse.optString("access_token", null)
-                val refreshToken = jsonResponse.optString("refresh_token", null) // Получаем refresh_token
+                val refreshToken = jsonResponse.optString("refresh_token", null)
                 val expiresIn = jsonResponse.optLong("expires_in", 3600)
 
                 if (accessToken != null && refreshToken != null) {
                     Log.i("SpotifyAuth", "Parsed access_token=${accessToken.takeLast(5)}, refresh_token=${refreshToken.takeLast(5)}, expires_in=$expiresIn")
-                    SecurePrefs.save(accessToken, refreshToken, expiresIn, this@MainActivity) // Сохраняем оба токена
+                    SecurePrefs.save(accessToken, refreshToken, expiresIn, this@MainActivity)
                     TokenResponse(accessToken, refreshToken, expiresIn)
                 } else {
                     Log.e("SpotifyAuth", "Access or Refresh token is null in response.")

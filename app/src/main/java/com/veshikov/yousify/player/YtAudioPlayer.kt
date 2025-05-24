@@ -4,9 +4,10 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.*
 import android.support.v4.media.session.MediaSessionCompat
@@ -15,6 +16,7 @@ import android.support.v4.media.MediaMetadataCompat as SupportMediaMetadata
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.*
@@ -70,6 +72,8 @@ class YtAudioPlayer : LifecycleService() {
     private var currentTrackTitle: String? = "Yousify"
     private var currentTrackArtist: String? = "Audio Player"
     private var currentThumbnailUrl: String? = null
+    private var currentAlbumArtBitmap: Bitmap? = null
+
 
     private var sponsorSegments: List<Pair<Long, Long>> = emptyList()
     private var lastSkippedSegmentIndex = -1
@@ -164,6 +168,7 @@ class YtAudioPlayer : LifecycleService() {
         mediaSession.setCallback(MediaSessionCallback())
 
         initializePlayer()
+        currentAlbumArtBitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_track_placeholder) // Дефолтная заглушка
     }
 
     private fun initializePlayer() {
@@ -202,6 +207,7 @@ class YtAudioPlayer : LifecycleService() {
         currentTrackTitle = title
         currentTrackArtist = artist
         currentThumbnailUrl = thumbnailUrl
+        currentAlbumArtBitmap = null // Сбрасываем старую обложку, новая загрузится
 
         lifecycleScope.launch {
             try {
@@ -210,7 +216,7 @@ class YtAudioPlayer : LifecycleService() {
                 }
                 exoPlayer.clearMediaItems()
 
-                updateMediaSessionMetadata(title, artist, thumbnailUrl)
+                updateMediaSessionMetadata() // Вызываем без параметров, она использует поля класса
 
                 sponsorSegments = emptyList()
                 lastSkippedSegmentIndex = -1
@@ -333,6 +339,17 @@ class YtAudioPlayer : LifecycleService() {
         }
     }
 
+    private fun drawableToBitmap(drawable: Drawable): Bitmap {
+        if (drawable is android.graphics.drawable.BitmapDrawable) {
+            return drawable.bitmap
+        }
+        val bitmap = Bitmap.createBitmap(drawable.intrinsicWidth.coerceAtLeast(1), drawable.intrinsicHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
+    }
+
     private fun createNotification(): Notification {
         val isPlayingNow = exoPlayer.isPlaying && exoPlayer.playbackState != Player.STATE_ENDED
 
@@ -355,20 +372,8 @@ class YtAudioPlayer : LifecycleService() {
         val metadata = mediaSession.controller.metadata
         val title = metadata?.getString(SupportMediaMetadata.METADATA_KEY_TITLE) ?: currentTrackTitle
         val artist = metadata?.getString(SupportMediaMetadata.METADATA_KEY_ARTIST) ?: currentTrackArtist
+        val artworkBitmap = currentAlbumArtBitmap ?: ContextCompat.getDrawable(this, R.drawable.ic_track_placeholder)?.let { drawableToBitmap(it) }
 
-        var albumArtBitmap: Bitmap? = metadata?.getBitmap(SupportMediaMetadata.METADATA_KEY_ALBUM_ART)
-        if (albumArtBitmap == null) {
-            try {
-                albumArtBitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_track_placeholder)
-            } catch (e: Resources.NotFoundException) {
-                Logger.e("$TAG: Placeholder drawable R.drawable.ic_track_placeholder not found.", e)
-                try {
-                    albumArtBitmap = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher) // Иконка приложения как запасной вариант
-                } catch (e2: Resources.NotFoundException) {
-                    Logger.e("$TAG: App launcher icon R.mipmap.ic_launcher also not found.", e2)
-                }
-            }
-        }
 
         val activityIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -376,19 +381,12 @@ class YtAudioPlayer : LifecycleService() {
         val contentPendingIntent = if (activityIntent != null) {
             PendingIntent.getActivity(this, 0, activityIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         } else {
-            mediaSession.controller.sessionActivity ?: PendingIntent.getService(this, 0, Intent(this, YtAudioPlayer::class.java), PendingIntent.FLAG_IMMUTABLE)
+            // Fallback: просто PendingIntent на сервис, если нет лаунчера
+            PendingIntent.getService(this, 0, Intent(this, YtAudioPlayer::class.java), PendingIntent.FLAG_IMMUTABLE)
         }
 
-        // ИСПРАВЛЕНО: Более надежное получение smallIcon
-        val smallNotificationIcon = try {
-            resources.getIdentifier("ic_notification_icon", "drawable", packageName).let {
-                if (it != 0) it else R.drawable.ic_play // Ваш ic_play.xml в качестве запасного варианта, если ic_notification_icon нет
-            }
-        } catch (e: Exception) { // Широкий Exception, т.к. getIdentifier может не найти
-            Logger.w("$TAG: ic_notification_icon not found, using ic_play as fallback for small icon.")
-            R.drawable.ic_play // Ваш ic_play.xml
-        }
-
+        // Используем стандартную иконку для smallIcon
+        val smallNotificationIcon = R.drawable.ic_notification_icon // Наш новый векторный значок
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
@@ -404,13 +402,13 @@ class YtAudioPlayer : LifecycleService() {
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2)
+                    .setShowActionsInCompactView(0, 1, 2) // Previous, Play/Pause, Next
                     .setShowCancelButton(true)
                     .setCancelButtonIntent(stopPendingIntent)
             )
             .setOngoing(isPlayingNow)
 
-        albumArtBitmap?.let {
+        artworkBitmap?.let {
             builder.setLargeIcon(it)
         }
 
@@ -424,13 +422,7 @@ class YtAudioPlayer : LifecycleService() {
             } catch (e: Exception) {
                 Logger.e("$TAG: Error creating or updating notification", e)
                 try {
-                    // ИСПРАВЛЕНО: Запасное уведомление также должно использовать безопасную иконку
-                    val fallbackSmallIcon = try {
-                        resources.getIdentifier("ic_notification_icon", "drawable", packageName).let {
-                            if (it != 0) it else R.drawable.ic_play
-                        }
-                    } catch (e: Exception) { R.drawable.ic_play }
-
+                    val fallbackSmallIcon = R.drawable.ic_notification_icon
                     val fallbackNotification = NotificationCompat.Builder(this, CHANNEL_ID)
                         .setSmallIcon(fallbackSmallIcon)
                         .setContentTitle(currentTrackTitle ?: "Yousify")
@@ -447,34 +439,33 @@ class YtAudioPlayer : LifecycleService() {
         }
     }
 
-    private fun updateMediaSessionMetadata(title: String, artist: String, thumbnailUrl: String?) {
+    private fun updateMediaSessionMetadata() {
         val durationMs = exoPlayer.duration.takeIf { it != C.TIME_UNSET } ?: -1L
         val metadataBuilder = SupportMediaMetadata.Builder()
-            .putString(SupportMediaMetadata.METADATA_KEY_TITLE, title)
-            .putString(SupportMediaMetadata.METADATA_KEY_ARTIST, artist)
-            .putString(SupportMediaMetadata.METADATA_KEY_ALBUM, artist)
+            .putString(SupportMediaMetadata.METADATA_KEY_TITLE, currentTrackTitle)
+            .putString(SupportMediaMetadata.METADATA_KEY_ARTIST, currentTrackArtist)
+            .putString(SupportMediaMetadata.METADATA_KEY_ALBUM, currentTrackArtist) // Можно оставить артиста или название альбома, если есть
             .putLong(SupportMediaMetadata.METADATA_KEY_DURATION, durationMs)
 
-        if (thumbnailUrl != null) {
+        if (currentAlbumArtBitmap != null) {
+            metadataBuilder.putBitmap(SupportMediaMetadata.METADATA_KEY_ALBUM_ART, currentAlbumArtBitmap)
+            mediaSession.setMetadata(metadataBuilder.build())
+            updateNotificationIfPermitted() // Обновляем уведомление сразу, если обложка уже есть
+        } else if (currentThumbnailUrl != null) {
             lifecycleScope.launch {
-                val bitmap = loadBitmapFromUrl(thumbnailUrl)
-                val finalBitmap = bitmap ?: try {
-                    BitmapFactory.decodeResource(resources, R.drawable.ic_track_placeholder)
-                } catch (e: Resources.NotFoundException) {
-                    Logger.e("$TAG: Placeholder for MediaSession metadata not found (after URL load fail).", e)
-                    null
-                }
+                val bitmap = loadBitmapFromUrl(currentThumbnailUrl!!) // !! т.к. проверили на null
+                currentAlbumArtBitmap = bitmap ?: ContextCompat.getDrawable(this@YtAudioPlayer, R.drawable.ic_track_placeholder)?.let { drawableToBitmap(it) }
 
-                finalBitmap?.let { metadataBuilder.putBitmap(SupportMediaMetadata.METADATA_KEY_ALBUM_ART, it) }
+                currentAlbumArtBitmap?.let {
+                    metadataBuilder.putBitmap(SupportMediaMetadata.METADATA_KEY_ALBUM_ART, it)
+                }
                 mediaSession.setMetadata(metadataBuilder.build())
-                updateNotificationIfPermitted()
+                updateNotificationIfPermitted() // Обновляем уведомление после загрузки/установки обложки
             }
-        } else {
-            try {
-                val placeholderBitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_track_placeholder)
-                placeholderBitmap?.let { metadataBuilder.putBitmap(SupportMediaMetadata.METADATA_KEY_ALBUM_ART, it) }
-            } catch (e: Resources.NotFoundException) {
-                Logger.e("$TAG: Placeholder for MediaSession metadata not found (no URL).", e)
+        } else { // Если нет ни URL, ни загруженной обложки, используем заглушку
+            currentAlbumArtBitmap = ContextCompat.getDrawable(this, R.drawable.ic_track_placeholder)?.let { drawableToBitmap(it) }
+            currentAlbumArtBitmap?.let {
+                metadataBuilder.putBitmap(SupportMediaMetadata.METADATA_KEY_ALBUM_ART, it)
             }
             mediaSession.setMetadata(metadataBuilder.build())
             updateNotificationIfPermitted()
@@ -639,6 +630,7 @@ class YtAudioPlayer : LifecycleService() {
         currentTrackTitle = "Yousify"
         currentTrackArtist = "Audio Player"
         currentThumbnailUrl = null
+        currentAlbumArtBitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_track_placeholder)
         sponsorSegments = emptyList()
         lastSkippedSegmentIndex = -1
 
