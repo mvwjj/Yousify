@@ -1,6 +1,6 @@
-@Suppress("DSL_SCOPE_VIOLATION")
+﻿@Suppress("DSL_SCOPE_VIOLATION")
 plugins {
-    // версии подтягиваются из pluginManagement
+    // Ð²ÐµÑ€ÑÐ¸Ð¸ Ð¿Ð¾Ð´Ñ‚ÑÐ³Ð¸Ð²Ð°ÑŽÑ‚ÑÑ Ð¸Ð· pluginManagement
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.kapt")
@@ -9,15 +9,15 @@ plugins {
 }
 
 android {
-    namespace  = "com.veshikov.yousify"
+    namespace  = "com.mvwj.yousify"
     compileSdk = 36
 
-    // Поддержка DataBinding KTX, совместимая с AGP 8.10
+    // ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ° DataBinding KTX, ÑÐ¾Ð²Ð¼ÐµÑÑ‚Ð¸Ð¼Ð°Ñ Ñ AGP 8.10
     configurations.all {
         resolutionStrategy.force("androidx.databinding:databinding-ktx:8.10.0")
     }
 
-    // ИСПРАВЛЕНО: Удалена установка свойства org.sqlite.tmpdir
+    // Ð˜Ð¡ÐŸÐ ÐÐ’Ð›Ð•ÐÐž: Ð£Ð´Ð°Ð»ÐµÐ½Ð° ÑƒÑÑ‚Ð°Ð½Ð¾Ð²ÐºÐ° ÑÐ²Ð¾Ð¹ÑÑ‚Ð²Ð° org.sqlite.tmpdir
     // System.setProperty(
     //     "org.sqlite.tmpdir",
     //     "C:/Users/aleksandr/AndroidStudioProjects/Youify/build/tmp/sqlite"
@@ -28,7 +28,7 @@ android {
             "redirectHostName"   to "127.0.0.1",
             "redirectSchemeName" to "http"
         )
-        applicationId = "com.veshikov.yousify"
+        applicationId = "com.mvwj.yousify"
         minSdk        = 24
         targetSdk     = 36
         versionCode   = 1
@@ -51,7 +51,7 @@ android {
     }
 
     composeOptions {
-        // Для Kotlin 2.1.21 не требуется указывать kotlinCompilerExtensionVersion
+        // Ð”Ð»Ñ Kotlin 2.1.21 Ð½Ðµ Ñ‚Ñ€ÐµÐ±ÑƒÐµÑ‚ÑÑ ÑƒÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ kotlinCompilerExtensionVersion
     }
 
     compileOptions {
@@ -109,7 +109,7 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // Ktor (локальный OAuth)
+    // Ktor (Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ OAuth)
     implementation("io.ktor:ktor-server-core:2.3.5")
     implementation("io.ktor:ktor-server-cio:2.3.5")
 
@@ -139,7 +139,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.5.0")
 
     // YouTube search
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:0.24.5")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.25.2")
 
     // String similarity
     implementation("com.aallam.similarity:string-similarity-kotlin:0.1.0")
@@ -147,7 +147,7 @@ dependencies {
     // TensorFlow Lite
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
 
-    // Room (обновлено до 2.7.1)
+    // Room (Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾ Ð´Ð¾ 2.7.1)
     val roomVersion = "2.7.1"
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")

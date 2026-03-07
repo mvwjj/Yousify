@@ -1,4 +1,4 @@
-#include <jni.h>
+﻿#include <jni.h>
 #include <faiss/IndexFlat.h>
 #include <faiss/index_io.h>
 #include <android/asset_manager_jni.h>
@@ -22,7 +22,7 @@ CacheHolder* getHolder(jlong handle) {
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_veshikov_Yousify_ann_VectorCache_nativeInit(JNIEnv* env, jobject thiz, jstring path_) {
+Java_com_mvwj_Yousify_ann_VectorCache_nativeInit(JNIEnv* env, jobject thiz, jstring path_) {
     const char* path = env->GetStringUTFChars(path_, 0);
     CacheHolder* holder = new CacheHolder();
     // mmap or load index
@@ -37,7 +37,7 @@ Java_com_veshikov_Yousify_ann_VectorCache_nativeInit(JNIEnv* env, jobject thiz, 
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_veshikov_Yousify_ann_VectorCache_add(JNIEnv* env, jobject thiz, jlong handle, jlong id, jfloatArray vec_) {
+Java_com_mvwj_Yousify_ann_VectorCache_add(JNIEnv* env, jobject thiz, jlong handle, jlong id, jfloatArray vec_) {
     auto* holder = getHolder(handle);
     jfloat* vec = env->GetFloatArrayElements(vec_, 0);
     holder->index->add(1, vec);
@@ -46,7 +46,7 @@ Java_com_veshikov_Yousify_ann_VectorCache_add(JNIEnv* env, jobject thiz, jlong h
 }
 
 extern "C" JNIEXPORT jlongArray JNICALL
-Java_com_veshikov_Yousify_ann_VectorCache_search(JNIEnv* env, jobject thiz, jlong handle, jfloatArray vec_, jint k) {
+Java_com_mvwj_Yousify_ann_VectorCache_search(JNIEnv* env, jobject thiz, jlong handle, jfloatArray vec_, jint k) {
     auto* holder = getHolder(handle);
     jfloat* vec = env->GetFloatArrayElements(vec_, 0);
     std::vector<faiss::Index::idx_t> I(k);
