@@ -2,6 +2,13 @@
 
 Yousify is an Android app for browsing Spotify playlists and playing matched audio through YouTube-based sources. Playlist data is synced from Spotify, stored locally, and used to drive queueing, search, filtering, and playback inside the app.
 
+## Screenshots
+
+![Yousify screenshot 4](screenshots/yousify4.jpg)
+![Yousify screenshot 1](screenshots/yousify.jpg)
+![Yousify screenshot 2](screenshots/yousify2.jpg)
+![Yousify screenshot 3](screenshots/yousify3.jpg)
+
 ## Features
 
 - Spotify login with user-provided developer credentials
