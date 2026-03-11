@@ -2,6 +2,20 @@
 
 Yousify is an Android app for browsing Spotify playlists and playing matched audio through YouTube-based sources. Playlist data is synced from Spotify, stored locally, and used to drive queueing, search, filtering, and playback inside the app.
 
+## Screenshots
+
+### Login page
+![Yousify screenshot 4](screenshots/login.jpg)
+
+### Playlist list
+![Yousify screenshot 1](screenshots/yousify.jpg)
+
+### Mini player
+![Yousify screenshot 2](screenshots/yousify2.jpg)
+
+### Available filters
+![Yousify screenshot 3](screenshots/yousify3.jpg)
+
 ## Features
 
 - Spotify login with user-provided developer credentials
@@ -24,20 +38,19 @@ You must use your own Spotify developer app:
 1. Open the Spotify Developer Dashboard: `https://developer.spotify.com/dashboard`
 2. Sign in with your Spotify account.
 3. Create a new app.
-4. Open the app settings and copy:
-   - `Client ID`
-   - `Client Secret`
+4. Open the app settings and copy your `Client ID`.
 5. Add this Redirect URI:
    `http://127.0.0.1:8888/callback`
 6. Save the app settings.
 7. Launch Yousify.
-8. After opening the app, enter your `Client ID` and `Client Secret` on the login screen.
+8. After opening the app, enter your `Client ID` on the login screen.
 9. Continue with Spotify login.
 
-The app stores these values only on the local device by using Android encrypted preferences. They are not intended to be committed to the repository.
+The app stores this value only on the local device by using Android encrypted preferences. It is not intended to be committed to the repository.
 
 ## Important Spotify Notes
 
+- Yousify uses Spotify Authorization Code Flow with PKCE, so a `Client Secret` is not required in the app.
 - Spotify developer apps start in Development Mode unless Spotify grants broader access.
 - Development Mode apps are restricted to allowlisted/test users.
 - If login works but playlist contents do not sync, first verify your app configuration in the Spotify dashboard.
@@ -58,11 +71,6 @@ The app stores these values only on the local device by using Android encrypted 
 ./gradlew assembleDebug
 ```
 
-## Privacy And Repository Safety
-
-- Do not commit your Spotify `Client ID`, `Client Secret`, access tokens, refresh tokens, device logs, or exported app data.
-- The repository is configured to ignore common local secret and log artifacts, but you should still review your changes before pushing.
-- If a secret was ever committed, rotate it and clean git history before publishing the repository.
 
 ## Disclaimer
 
