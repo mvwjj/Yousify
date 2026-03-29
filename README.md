@@ -5,16 +5,16 @@ Yousify is an Android app for browsing Spotify playlists and playing matched aud
 ## Screenshots
 
 ### Login page
-![Yousify screenshot 4](https://raw.githubusercontent.com/mvwj/Yousify/main/screenshots/login.jpg)
+![Yousify screenshot 4](screenshots/login.png)
 
 ### Playlist list
-![Yousify screenshot 1](https://raw.githubusercontent.com/mvwj/Yousify/main/screenshots/yousify.jpg)
+![Yousify screenshot 1](screenshots/yousify.png)
 
 ### Mini player
-![Yousify screenshot 2](https://raw.githubusercontent.com/mvwj/Yousify/main/screenshots/yousify2.jpg)
+![Yousify screenshot 2](screenshots/yousify2.png)
 
 ### Available filters
-![Yousify screenshot 3](https://raw.githubusercontent.com/mvwj/Yousify/main/screenshots/yousify3.jpg)
+![Yousify screenshot 3](screenshots/yousify3.png)
 
 ## Features
 
